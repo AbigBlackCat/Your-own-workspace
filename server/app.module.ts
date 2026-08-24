@@ -4,13 +4,14 @@ import { PlatformModule } from '@lark-apaas/fullstack-nestjs-core';
 
 import { GlobalExceptionFilter } from './common/filters/exception.filter';
 import { ViewModule } from './modules/view/view.module';
+import { WorkspaceModule } from './modules/workspace/workspace.module';
 
 @Module({
   imports: [
     // 平台 Module，提供平台能力
     PlatformModule.forRoot(),
     // ====== @route-section: business-modules START ======
-    // Place all business modules here.Do NOT add fallback modules here.
+    WorkspaceModule,
     // ====== @route-section: business-modules END ======
 
     // ⚠️ @route-order: last

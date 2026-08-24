@@ -1,21 +1,43 @@
-import React from 'react';
-import { Route, Routes } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Navigate, Route, Routes } from 'react-router-dom';
 
-// This is a temporary placeholder component from spark-framework
-import { Welcome } from '@lark-apaas/client-toolkit/components/Welcome';
+import { WorkspaceProvider } from './WorkspaceContext';
+import { AppLayout } from './components/Layout';
+import { ConsultingPage } from './pages/ConsultingPage';
+import { DashboardPage } from './pages/DashboardPage';
+import { DevelopmentPage } from './pages/DevelopmentPage';
+import { DietPage } from './pages/DietPage';
+import { FitnessPage } from './pages/FitnessPage';
+import { MediaPage } from './pages/MediaPage';
+import { ReadingPage } from './pages/ReadingPage';
+import { SettingsPage } from './pages/SettingsPage';
+import { TodayPage } from './pages/TodayPage';
 
-import Layout from './components/Layout';
-import NotFound from './pages/NotFound/NotFound';
+const queryClient = new QueryClient({
+  defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false }, mutations: { retry: 0 } },
+});
 
 const RoutesComponent = () => {
   return (
-    <Routes>
-      <Route element={<Layout />}>
-        {/* This Welcome component should be replaced with the actual home page content */}
-        <Route index element={<Welcome />} />
-      </Route>
-      <Route path="*" element={<NotFound />} />
-    </Routes>
+    <QueryClientProvider client={queryClient}>
+      <WorkspaceProvider>
+        <Routes>
+          <Route path="/" element={<AppLayout />}>
+            <Route index element={<DashboardPage />} />
+            <Route path="today" element={<TodayPage />} />
+            <Route path="media" element={<MediaPage />} />
+            <Route path="development" element={<DevelopmentPage />} />
+            <Route path="consulting" element={<ConsultingPage />} />
+            <Route path="fitness" element={<FitnessPage />} />
+            <Route path="diet" element={<DietPage />} />
+            <Route path="reading" element={<ReadingPage />} />
+            <Route path="entertainment" element={<Navigate to="/reading" replace />} />
+            <Route path="settings" element={<SettingsPage />} />
+          </Route>
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </WorkspaceProvider>
+    </QueryClientProvider>
   );
 };
 
