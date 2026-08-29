@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip } from "recharts";
-import { Plus, Play, Check, Barbell, TrendUp, CalendarPlus, ArrowsClockwise } from "../icons";
+import { Plus, Play, Check, Barbell, TrendUp, CalendarPlus, ArrowsClockwise, ArrowCounterClockwise, CaretLeft, CaretRight } from "../icons";
 import { api } from "../api";
 import { useWorkspace } from "../WorkspaceContext";
 import { MonthCalendar } from "../components/MonthCalendar";
@@ -15,6 +15,7 @@ export function FitnessPage() {
   const [dialog, setDialog] = useState<{ type: string; item?: Record<string, any> } | null>(null);
   const [templateId, setTemplateId] = useState<string | null>(data.workoutTemplates[0]?.id ?? null);
   const [calendarMonth, setCalendarMonth] = useState(localDate().slice(0, 7));
+  const [templateStatsMonth, setTemplateStatsMonth] = useState(localDate().slice(0, 7));
   const [selectedDate, setSelectedDate] = useState(localDate());
   const [xunjiSyncing, setXunjiSyncing] = useState(false);
   const [xunjiError, setXunjiError] = useState("");
@@ -42,6 +43,19 @@ export function FitnessPage() {
   };
   const weightChart = [...data.bodyMetrics].sort((a, b) => a.metric_date.localeCompare(b.metric_date)).slice(-12).map((item) => ({ date: item.metric_date.slice(5), weight: item.weight }));
   const latestXunjiSync = data.xunjiSyncs[0];
+  const currentMonth = localDate().slice(0, 7);
+  const templateMonthlyStats = useMemo(() => {
+    const counts = new Map<string, { name: string; count: number }>();
+    for (const workout of data.workouts) {
+      if (workout.status !== "completed" || !String(workout.workout_date ?? "").startsWith(templateStatsMonth)) continue;
+      const template = data.workoutTemplates.find((item) => item.id === workout.template_id);
+      const key = workout.template_id ? `template:${workout.template_id}` : `workout:${workout.name}`;
+      const prior = counts.get(key) ?? { name: template?.name || workout.name || "未命名训练", count: 0 };
+      prior.count += 1;
+      counts.set(key, prior);
+    }
+    return [...counts.values()].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, "zh-CN"));
+  }, [data.workoutTemplates, data.workouts, templateStatsMonth]);
   const syncXunji = async () => {
     setXunjiSyncing(true);
     setXunjiError("");
@@ -76,8 +90,11 @@ export function FitnessPage() {
           {weightChart.length ? <div className="chart-wrap"><ResponsiveContainer width="100%" height={240}><LineChart data={weightChart}><XAxis dataKey="date" tickLine={false} axisLine={false} /><YAxis domain={["dataMin - 2", "dataMax + 2"]} tickLine={false} axisLine={false} /><Tooltip /><Line type="monotone" dataKey="weight" stroke="var(--accent)" strokeWidth={2.5} dot={{ fill: "var(--surface)", stroke: "var(--accent)", strokeWidth: 2 }} /></LineChart></ResponsiveContainer></div> : <EmptyState title="还没有身体数据" description="记录体重后，这里会出现趋势。" />}
         </Section>
       </div>
-      <Section title="近期训练" description="历史训练保留当时的动作与组数据" action={<Button variant="ghost" size="sm" onClick={() => setDialog({ type: "workout" })}><CalendarPlus size={15} />安排训练</Button>}>
+      <Section title="训练日记" description="历史训练保留当时的动作与组数据" action={<Button variant="ghost" size="sm" onClick={() => setDialog({ type: "workout" })}><CalendarPlus size={15} />安排训练</Button>}>
         {recentWorkouts.length ? <div className="history-table">{recentWorkouts.slice(0, 10).map((item) => <article key={item.id}><div><strong>{item.name}</strong><small>{formatDate(item.workout_date)}</small></div><Badge tone={item.status === "completed" ? "success" : item.status === "in_progress" ? "warning" : "neutral"}>{item.status === "completed" ? "已完成" : item.status === "in_progress" ? "进行中" : "已计划"}</Badge><p>{item.feeling || "没有训练感受"}</p></article>)}</div> : <p className="quiet-line">还没有训练记录。</p>}
+      </Section>
+      <Section title="模板月度训练次数" description="只统计已完成训练，按所选月份查看实际训练量。" className="template-monthly-section" action={<div className="template-month-controls"><Button variant="ghost" size="sm" onClick={() => setTemplateStatsMonth(offsetMonth(templateStatsMonth, -1))} aria-label="查看上个月"><CaretLeft size={16} /></Button><strong>{formatMonthKey(templateStatsMonth)}</strong><Button variant="ghost" size="sm" onClick={() => setTemplateStatsMonth(offsetMonth(templateStatsMonth, 1))} aria-label="查看下个月" disabled={templateStatsMonth >= currentMonth}><CaretRight size={16} /></Button><Button variant="ghost" size="sm" onClick={() => setTemplateStatsMonth(currentMonth)} disabled={templateStatsMonth === currentMonth}><ArrowCounterClockwise size={14} />本月</Button></div>}>
+        <details className="template-monthly-disclosure"><summary><span><Barbell size={18} />查看 {formatMonthKey(templateStatsMonth)} 的模板训练分布</span><small>{templateMonthlyStats.reduce((total, item) => total + item.count, 0)} 次已完成训练</small></summary>{templateMonthlyStats.length ? <div className="template-monthly-chart">{templateMonthlyStats.map((item) => <article key={item.name}><div className="template-monthly-label"><strong>{item.name}</strong><span>{item.count} 次</span></div><div className="template-monthly-icons" aria-label={`${item.name}，${item.count} 次训练`}>{Array.from({ length: Math.min(item.count, 8) }, (_, index) => <Barbell key={index} size={17} />)}{item.count > 8 ? <small>+{item.count - 8}</small> : null}</div></article>)}</div> : <EmptyState title="这个月还没有已完成训练" description="完成一次训练后，会按照训练模板计入这里。" />}</details>
       </Section>
       <FitnessDialog dialog={dialog} close={close} template={template} run={run} />
     </div>
@@ -129,3 +146,6 @@ function getWorkoutExerciseSummaries(data: any, workout: any): string[] {
   });
   return data.workoutTemplateExercises.filter((item: any) => item.template_id === workout.template_id).sort((a: any, b: any) => a.sort_order - b.sort_order).map((exercise: any) => `${exercise.name} ${exercise.target_sets || 1}×${exercise.target_reps || "自定"}`);
 }
+
+function offsetMonth(month: string, offset: number): string { const [year, value] = month.split("-").map(Number); const next = new Date(year, value - 1 + offset, 1); return `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}`; }
+function formatMonthKey(month: string): string { const [year, value] = month.split("-"); return `${year}年${Number(value)}月`; }

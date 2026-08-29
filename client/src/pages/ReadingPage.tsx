@@ -7,10 +7,10 @@ import { formatDateTime } from "../workspace-utils";
 import { Button, EmptyState, ErrorState, PageHeader, Section, Skeleton } from "../components/workspace-ui";
 import { ModuleArtwork } from "../components/ModuleArtwork";
 
-type ReadingNote = { id: string; quote_text: string; thought_text: string; chapter_title: string; source_created_at: string; book_title: string; book_author: string };
+type ReadingNote = { id: string; note_kind: string; quote_text: string; thought_text: string; chapter_title: string; source_created_at: string; book_title: string; book_author: string };
 type ReadingBook = { id: string; title: string; author: string; category: string; progress: number | null; finished: number; last_read_at: number | null; deep_link: string; note_count: number };
 type BookRecord = { id: string; title: string; author: string; seconds: number | null };
-type ReadingDashboard = { goalMinutes: number; today: string; todaySeconds: number; weeklySeconds: number; totalSeconds: number; readDays: number; streak: number; syncedAt: string | null; notes: ReadingNote[]; books: ReadingBook[]; calendar: Record<string, number>; bookRecords: Record<string, BookRecord[]> };
+type ReadingDashboard = { goalMinutes: number; today: string; todaySeconds: number; weeklySeconds: number; totalSeconds: number; readDays: number; streak: number; syncedAt: string | null; notes: ReadingNote[]; books: ReadingBook[]; recentHistory: Array<{ date: string; seconds: number }>; calendar: Record<string, number>; bookRecords: Record<string, BookRecord[]> };
 
 export function ReadingPage() {
   const { refresh } = useWorkspace();
@@ -20,6 +20,7 @@ export function ReadingPage() {
   const [month, setMonth] = useState(() => monthKey(new Date()));
   const [selectedDate, setSelectedDate] = useState(() => localDate());
   const [goal, setGoal] = useState(30);
+  const [notesExpanded, setNotesExpanded] = useState(false);
   const calendar = useQuery<{ month: string; days: Record<string, number>; bookRecords: Record<string, BookRecord[]> }>({ queryKey: ["reading-calendar", month], queryFn: () => api.readingCalendar(month), enabled: dashboard.isSuccess, staleTime: 15_000 });
 
   useEffect(() => { if (dashboard.data) setGoal(dashboard.data.goalMinutes); }, [dashboard.data]);
@@ -59,6 +60,10 @@ export function ReadingPage() {
   const progress = Math.min(100, (minutes / data.goalMinutes) * 100);
   const selectedSeconds = Number(calendarData.days[selectedDate] ?? 0);
   const records = calendarData.bookRecords[selectedDate] ?? [];
+  const highlights = data.notes.filter((note) => note.note_kind === "highlight" && Boolean(note.quote_text)).slice(0, 3);
+  const featuredNotes = highlights.length ? highlights : data.notes.slice(0, 3);
+  const visibleNotes = notesExpanded ? data.notes : data.notes.slice(0, 3);
+  const maxRecentSeconds = Math.max(1, ...data.recentHistory.map((day) => day.seconds));
 
   return (
     <div className="reading-page">
@@ -80,7 +85,7 @@ export function ReadingPage() {
           </article>
           <article className="reading-note-panel frosted-content">
             <div className="reading-panel-label"><span>{data.notes.some((note) => note.source_created_at.slice(0, 10) === data.today) ? "今日回味" : "最近回味"}</span><Quotes size={18} /></div>
-            {data.notes.length ? <div className="reading-featured-note"><blockquote>{data.notes[0].quote_text || data.notes[0].thought_text}</blockquote>{data.notes[0].thought_text && data.notes[0].quote_text ? <p>{data.notes[0].thought_text}</p> : null}<footer>{data.notes[0].book_title}{data.notes[0].book_author ? ` · ${data.notes[0].book_author}` : ""}</footer></div> : <p className="reading-empty-copy">同步后，这里会留住你划线或写下想法的句子。</p>}
+            {featuredNotes.length ? <div className="reading-featured-rail" aria-label="最近三条划线内容">{featuredNotes.map((note) => <FeaturedNote key={note.id} note={note} />)}</div> : <p className="reading-empty-copy">同步后，这里会留住你划线或写下想法的句子。</p>}
           </article>
           <aside className="reading-rhythm-panel frosted-content">
             <div><Fire size={19} weight="fill" /><span>连续阅读</span><strong>{data.streak}<small>天</small></strong></div>
@@ -91,10 +96,11 @@ export function ReadingPage() {
 
         <div className="reading-content-grid">
           <Section title="最近翻开的书" description="按微信读书中的最后阅读时间排列" className="reading-books-section">
-            {data.books.length ? <div className="reading-book-list">{data.books.map((book) => <BookRow key={book.id} book={book} />)}</div> : <p className="quiet-line">同步后会显示最近阅读的书。</p>}
+            {data.books.length ? <div className="reading-book-rail" aria-label="最近翻开的书，向右滑动查看更多">{data.books.map((book) => <BookRow key={book.id} book={book} />)}</div> : <p className="quiet-line">同步后会显示最近阅读的书。</p>}
           </Section>
-          <Section title="阅读轨迹" description="累计的阅读时长与习惯" className="reading-total-section">
-            <div className="reading-total"><span>全部阅读</span><strong>{formatReadingSeconds(data.totalSeconds)}</strong><p>共 {data.readDays} 个有效阅读日。读满 1 分钟会计入一天。</p></div>
+          <Section title="阅读轨迹" description="最近 14 天的每日阅读时长" className="reading-total-section">
+            <div className="reading-trajectory-summary"><div className="reading-total"><span>全部阅读</span><strong>{formatReadingSeconds(data.totalSeconds)}</strong><p>共 {data.readDays} 个有效阅读日。</p></div><div className="reading-trajectory-note"><strong>14 天</strong><span>向右滑动查看每日阅读节奏</span></div></div>
+            <div className="recent-reading-history" aria-label="最近十四天阅读时长"><div className="recent-reading-rail">{data.recentHistory.map((day) => <article className="recent-reading-day" data-active={day.seconds >= 60} data-today={day.date === data.today} key={day.date} title={`${formatDayLabel(day.date)}：${formatReadingSeconds(day.seconds)}`}><div className="recent-reading-bar-stage"><span style={{ height: `${Math.max(4, (day.seconds / maxRecentSeconds) * 100)}%` }} /></div><strong>{formatReadingShort(day.seconds)}</strong><time dateTime={day.date}>{formatDayLabel(day.date)}</time></article>)}</div></div>
           </Section>
         </div>
 
@@ -105,8 +111,8 @@ export function ReadingPage() {
           </div>
         </Section>
 
-        <Section title="笔记与划线" description="同步保存的划线与个人想法；书签只保留数量。" className="reading-notes-section">
-          {data.notes.length ? <div className="reading-note-list">{data.notes.slice(0, 12).map((note) => <NoteRow key={note.id} note={note} />)}</div> : <p className="quiet-line">还没有可显示的笔记。</p>}
+        <Section title="笔记与划线" description="默认显示最近 3 条，横向滑动浏览。书签只保留数量。" className="reading-notes-section" action={data.notes.length > 3 ? <Button variant="ghost" size="sm" onClick={() => setNotesExpanded((value) => !value)}>{notesExpanded ? "收起" : `展开全部 ${data.notes.length} 条`}</Button> : undefined}>
+          {data.notes.length ? <div className="reading-note-rail" aria-label="笔记与划线，向右滑动浏览">{visibleNotes.map((note) => <NoteRow key={note.id} note={note} />)}</div> : <p className="quiet-line">还没有可显示的笔记。</p>}
         </Section>
       </>}
     </div>
@@ -118,11 +124,17 @@ function BookRow({ book }: { book: ReadingBook }) {
   return book.deep_link ? <a className="reading-book-row" href={book.deep_link}>{contents}</a> : <div className="reading-book-row">{contents}</div>;
 }
 
+function FeaturedNote({ note }: { note: ReadingNote }) {
+  return <article className="reading-featured-note"><blockquote>{note.quote_text || note.thought_text}</blockquote>{note.thought_text && note.quote_text ? <p>{note.thought_text}</p> : null}<footer>{note.book_title}{note.book_author ? ` · ${note.book_author}` : ""}</footer></article>;
+}
+
 function NoteRow({ note }: { note: ReadingNote }) {
   return <article className="reading-note-row"><Quotes size={17} aria-hidden="true" /><div>{note.quote_text ? <blockquote>{note.quote_text}</blockquote> : null}{note.thought_text ? <p>{note.thought_text}</p> : null}<footer>{note.book_title}{note.book_author ? ` · ${note.book_author}` : ""}{note.chapter_title ? ` · ${note.chapter_title}` : ""}</footer></div></article>;
 }
 
 function formatReadingSeconds(seconds = 0): string { const minutes = Math.floor(Number(seconds) / 60); return minutes < 60 ? `${minutes} 分钟` : `${Math.floor(minutes / 60)} 小时 ${minutes % 60} 分钟`; }
+function formatReadingShort(seconds = 0): string { const minutes = Math.floor(Number(seconds) / 60); return minutes < 60 ? `${minutes}分` : `${Math.floor(minutes / 60)}时${minutes % 60}分`; }
+function formatDayLabel(date: string): string { const value = new Date(`${date}T12:00:00`); return `${value.getMonth() + 1}/${value.getDate()}`; }
 function localDate(): string { return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Shanghai", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()); }
 function monthKey(date: Date): string { return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`; }
 function formatMonth(month: string): string { const [year, value] = month.split("-"); return `${year}年${Number(value)}月`; }

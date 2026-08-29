@@ -1,9 +1,10 @@
 import { classNames } from "../workspace-utils";
-import { Barbell, BookOpen, CalendarBlank, ChartLine, Database, ForkKnife, GitBranch, SquaresFour, Users } from "../icons";
+import { Barbell, BookOpen, CalendarBlank, ChartLine, Database, ForkKnife, GitBranch, NotePencil, SquaresFour, Users } from "../icons";
 
 const moduleArtwork = {
   dashboard: SquaresFour,
   today: CalendarBlank,
+  metacognition: NotePencil,
   media: ChartLine,
   development: GitBranch,
   consulting: Users,

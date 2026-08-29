@@ -12,6 +12,7 @@ import { MediaPage } from './pages/MediaPage';
 import { ReadingPage } from './pages/ReadingPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { TodayPage } from './pages/TodayPage';
+import { MetacognitionPage } from './pages/MetacognitionPage';
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false }, mutations: { retry: 0 } },
@@ -25,6 +26,7 @@ const RoutesComponent = () => {
           <Route path="/" element={<AppLayout />}>
             <Route index element={<DashboardPage />} />
             <Route path="today" element={<TodayPage />} />
+            <Route path="metacognition" element={<MetacognitionPage />} />
             <Route path="media" element={<MediaPage />} />
             <Route path="development" element={<DevelopmentPage />} />
             <Route path="consulting" element={<ConsultingPage />} />

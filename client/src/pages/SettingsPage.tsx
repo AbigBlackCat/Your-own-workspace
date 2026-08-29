@@ -12,7 +12,7 @@ import { ModuleArtwork } from '../components/ModuleArtwork';
 import { Badge, Button, ConfirmDialog, PageHeader, Section, Skeleton } from '../components/workspace-ui';
 
 const collectionLabels: Record<string, string> = {
-  planItems: '今日计划', quickMemos: '快速备忘', mediaContents: '自媒体', devProjects: '开发项目', devMilestones: '里程碑',
+  planItems: '今日计划', quickMemos: '快速备忘', dailyMetacognitions: '每日元认知', mediaContents: '自媒体', devProjects: '开发项目', devMilestones: '里程碑',
   devWorkItems: '开发工作项', devLogs: '开发日志', clients: '客户', consultingProjects: '咨询项目', consultingInteractions: '沟通记录',
   consultingDeliverables: '咨询交付物', consultingFollowups: '咨询跟进', consultingTimeEntries: '咨询时长', workoutTemplates: '训练模板',
   workoutTemplateExercises: '模板动作', workouts: '训练记录', workoutExercises: '训练动作', workoutSets: '训练组', bodyMetrics: '身体数据',

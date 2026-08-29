@@ -99,6 +99,7 @@ export function buildReadingDashboard(state: WorkspaceState): Record<string, any
   const latestNotes = todayNotes.length ? todayNotes : notesWithBooks(state).sort((a, b) => String(b.source_created_at).localeCompare(String(a.source_created_at))).slice(0, 12);
   const currentMonth = today.slice(0, 7);
   const latestSync = active(state.readingSyncs).sort((a, b) => String(b.synced_at).localeCompare(String(a.synced_at)))[0];
+  const recentHistory = buildRecentHistory(secondsByDate, today);
   return {
     goalMinutes: clamp(number(state.settings.readingGoalMinutes, 30), 5, 600),
     today,
@@ -110,9 +111,17 @@ export function buildReadingDashboard(state: WorkspaceState): Record<string, any
     syncedAt: latestSync?.synced_at ?? null,
     notes: latestNotes,
     books: books.slice(0, 8),
+    recentHistory,
     calendar: Object.fromEntries(Object.entries(secondsByDate).filter(([date]) => date.startsWith(currentMonth))),
     bookRecords: bookRecords(state, currentMonth, books),
   };
+}
+
+function buildRecentHistory(secondsByDate: Record<string, number>, today: string): Array<{ date: string; seconds: number }> {
+  return Array.from({ length: 14 }, (_, index) => {
+    const date = addDays(today, index - 13);
+    return { date, seconds: number(secondsByDate[date]) };
+  });
 }
 
 export function buildCalendar(state: WorkspaceState, month: string): Record<string, any> {
@@ -285,4 +294,5 @@ function localDate(): string { return dateKey(Math.floor(Date.now() / 1000)); }
 function timestampYear(timestamp: number, fallback: number): number { return timestamp > 0 ? new Date(timestamp * 1000).getUTCFullYear() : fallback; }
 function previousDate(date: string): string { const value = new Date(`${date}T12:00:00Z`); value.setUTCDate(value.getUTCDate() - 1); return value.toISOString().slice(0, 10); }
 function weekStart(date: string): string { const value = new Date(`${date}T12:00:00Z`); const weekday = value.getUTCDay() || 7; value.setUTCDate(value.getUTCDate() - weekday + 1); return value.toISOString().slice(0, 10); }
+function addDays(date: string, days: number): string { const value = new Date(`${date}T12:00:00Z`); value.setUTCDate(value.getUTCDate() + days); return value.toISOString().slice(0, 10); }
 function readingStreak(days: Record<string, number>, today: string): number { let cursor = number(days[today]) >= 60 ? today : previousDate(today); let streak = 0; while (number(days[cursor]) >= 60) { streak += 1; cursor = previousDate(cursor); } return streak; }

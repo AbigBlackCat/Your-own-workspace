@@ -3,6 +3,7 @@ export type Entity = Record<string, any> & { id: string };
 export type WorkspaceState = {
   planItems: Entity[];
   quickMemos: Entity[];
+  dailyMetacognitions: Entity[];
   mediaContents: Entity[];
   devProjects: Entity[];
   devMilestones: Entity[];

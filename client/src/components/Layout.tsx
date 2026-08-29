@@ -18,6 +18,7 @@ const groups = [
   { label: "日常", links: [
     { to: "/", label: "首页总览", module: "dashboard", tone: "sky" },
     { to: "/today", label: "今日计划", module: "today", tone: "cyan" },
+    { to: "/metacognition", label: "每日元认知", module: "metacognition", tone: "cyan" },
   ] },
   { label: "工作", links: [
     { to: "/media", label: "自媒体", module: "media", tone: "coral" },
@@ -38,20 +39,21 @@ const collectionRoutes: Record<string, string> = {
   consultingInteractions: "/consulting", consultingDeliverables: "/consulting", consultingFollowups: "/consulting",
   consultingTimeEntries: "/consulting", workoutTemplates: "/fitness", workouts: "/fitness", bodyMetrics: "/fitness",
   nutritionTargets: "/diet", foods: "/diet", meals: "/diet", mealItems: "/diet", readingBooks: "/reading",
-  readingDays: "/reading", readingNotes: "/reading", readingBookDays: "/reading", readingSyncs: "/reading", quickMemos: "/",
+  readingDays: "/reading", readingNotes: "/reading", readingBookDays: "/reading", readingSyncs: "/reading", quickMemos: "/", dailyMetacognitions: "/metacognition",
 };
 
 const routeMeta: Record<string, { label: string; module: ModuleArtworkName; tone: string; index: string }> = {
   "/": { label: "首页总览", module: "dashboard", tone: "sky", index: "00" },
   "/today": { label: "今日计划", module: "today", tone: "cyan", index: "01" },
-  "/media": { label: "自媒体", module: "media", tone: "coral", index: "02" },
-  "/development": { label: "开发工作", module: "development", tone: "teal", index: "03" },
-  "/consulting": { label: "咨询工作", module: "consulting", tone: "amber", index: "04" },
-  "/fitness": { label: "健身计划", module: "fitness", tone: "sage", index: "05" },
-  "/diet": { label: "饮食计划", module: "diet", tone: "apricot", index: "06" },
-  "/reading": { label: "阅读桌面", module: "reading", tone: "violet", index: "07" },
-  "/entertainment": { label: "阅读桌面", module: "reading", tone: "violet", index: "07" },
-  "/settings": { label: "数据与设置", module: "settings", tone: "graphite", index: "08" },
+  "/metacognition": { label: "每日元认知", module: "metacognition", tone: "cyan", index: "02" },
+  "/media": { label: "自媒体", module: "media", tone: "coral", index: "03" },
+  "/development": { label: "开发工作", module: "development", tone: "teal", index: "04" },
+  "/consulting": { label: "咨询工作", module: "consulting", tone: "amber", index: "05" },
+  "/fitness": { label: "健身计划", module: "fitness", tone: "sage", index: "06" },
+  "/diet": { label: "饮食计划", module: "diet", tone: "apricot", index: "07" },
+  "/reading": { label: "阅读桌面", module: "reading", tone: "violet", index: "08" },
+  "/entertainment": { label: "阅读桌面", module: "reading", tone: "violet", index: "08" },
+  "/settings": { label: "数据与设置", module: "settings", tone: "graphite", index: "09" },
 };
 
 export function AppLayout() {
@@ -159,7 +161,7 @@ export function AppLayout() {
             <IconButton label={collapsed ? "展开导航" : "切换导航"} onClick={toggleNavigation}><SidebarSimple size={20} /></IconButton>
             <span className="toolbar-page-icon" data-tone={currentPage.tone} aria-hidden="true"><ModuleArtwork module={currentPage.module} /></span>
             <div className="toolbar-context"><strong>{currentPage.label}</strong><span>{new Intl.DateTimeFormat("zh-CN", { month: "long", day: "numeric", weekday: "long" }).format(new Date())}</span></div>
-            {appearance === "neo" ? <span className="topbar-index">{currentPage.index} / 08</span> : null}
+            {appearance === "neo" ? <span className="topbar-index">{currentPage.index} / 09</span> : null}
           </div>
           <div className="topbar-actions">
             <button className="search-trigger glass-clear" aria-label="搜索所有内容" title="搜索所有内容" onClick={() => setSearchOpen(true)}><MagnifyingGlass size={18} /><span>搜索所有内容</span><kbd><Command size={12} />K</kbd></button>
@@ -172,8 +174,8 @@ export function AppLayout() {
       <SearchModal open={searchOpen} onClose={() => setSearchOpen(false)} />
       <QuickCreateModal open={quickOpen} onClose={() => setQuickOpen(false)} />
       <nav className="mobile-dock" aria-label="手机快捷导航">
-        {[groups[0].links[0], groups[0].links[1], groups[2].links[0], groups[2].links[2], groups[3].links[0]].map(({ to, label, module }) => (
-          <NavLink key={to} to={to} end={to === "/"}><ModuleArtwork module={module} /><span>{label.replace("首页总览", "首页").replace("今日计划", "计划").replace("健身计划", "健身").replace("阅读桌面", "阅读").replace("数据与设置", "设置")}</span></NavLink>
+        {[groups[0].links[0], groups[0].links[1], groups[0].links[2], groups[2].links[0], groups[2].links[2]].map(({ to, label, module }) => (
+          <NavLink key={to} to={to} end={to === "/"}><ModuleArtwork module={module} /><span>{label.replace("首页总览", "首页").replace("今日计划", "计划").replace("每日元认知", "元认知").replace("健身计划", "健身").replace("阅读桌面", "阅读")}</span></NavLink>
         ))}
       </nav>
     </div>
@@ -210,7 +212,7 @@ function SearchModal({ open, onClose }: { open: boolean; onClose: () => void }) 
       return result;
     }, {});
   }, [search.data]);
-  const moduleNames: Record<string, string> = { dashboard: "首页", today: "今日计划", media: "自媒体", development: "开发工作", consulting: "咨询工作", fitness: "健身计划", diet: "饮食计划", reading: "阅读桌面" };
+  const moduleNames: Record<string, string> = { dashboard: "首页", today: "今日计划", metacognition: "每日元认知", media: "自媒体", development: "开发工作", consulting: "咨询工作", fitness: "健身计划", diet: "饮食计划", reading: "阅读桌面" };
   return (
     <Modal open={open} title="搜索工作台" description="按模块查找标题、笔记和记录内容" onClose={onClose} wide>
       <div className="command-search glass-clear"><MagnifyingGlass size={20} /><input autoFocus aria-label="搜索关键词" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="输入关键词" /></div>

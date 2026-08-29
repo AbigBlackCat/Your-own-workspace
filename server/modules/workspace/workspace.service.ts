@@ -210,6 +210,24 @@ export class WorkspaceService {
         review = { id: date, review_date: date, content, created_at: now, updated_at: now };
         state.dailyReviews.unshift(review);
       }
+      const metaId = `daily-review:${date}`;
+      const metacognition = state.dailyMetacognitions.find((row) => row.id === metaId);
+      if (metacognition) {
+        metacognition.content = content;
+        metacognition.updated_at = now;
+        metacognition.deleted_at = null;
+      } else {
+        state.dailyMetacognitions.unshift({
+          id: metaId,
+          entry_date: date,
+          content,
+          source_type: 'daily_review',
+          source_id: date,
+          created_at: review.created_at ?? now,
+          updated_at: now,
+          deleted_at: null,
+        });
+      }
       return review;
     });
   }
@@ -337,6 +355,21 @@ export function normalizeState(input: Record<string, any>): WorkspaceState {
   if (!state.settings || typeof state.settings !== 'object' || Array.isArray(state.settings)) state.settings = {};
   if (!Array.isArray(state.trash)) state.trash = [];
   if (!Array.isArray(state.dailyReviews)) state.dailyReviews = [];
+  for (const review of state.dailyReviews) {
+    if (!review?.review_date || !String(review.content ?? '').trim()) continue;
+    const id = `daily-review:${review.review_date}`;
+    if ((state.dailyMetacognitions as Entity[]).some((entry) => entry.id === id)) continue;
+    (state.dailyMetacognitions as Entity[]).push({
+      id,
+      entry_date: review.review_date,
+      content: review.content,
+      source_type: 'daily_review',
+      source_id: review.review_date,
+      created_at: review.created_at ?? review.updated_at ?? `${review.review_date}T12:00:00.000Z`,
+      updated_at: review.updated_at ?? review.created_at ?? `${review.review_date}T12:00:00.000Z`,
+      deleted_at: null,
+    });
+  }
   return state;
 }
 

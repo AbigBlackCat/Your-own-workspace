@@ -15,6 +15,14 @@ export const collectionDefinitions = {
     fields: ["content", "archived_at", "converted_type", "converted_id"],
     search: ["content"],
   },
+  dailyMetacognitions: {
+    table: "daily_metacognitions",
+    title: "content",
+    module: "metacognition",
+    required: ["entry_date", "content"],
+    fields: ["entry_date", "content", "source_type", "source_id"],
+    search: ["content"],
+  },
   mediaContents: {
     table: "media_contents",
     title: "title",
