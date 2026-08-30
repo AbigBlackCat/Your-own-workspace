@@ -83,10 +83,6 @@ export function ReadingPage() {
             <div className="reading-meter" role="progressbar" aria-valuemin={0} aria-valuemax={data.goalMinutes} aria-valuenow={Math.min(minutes, data.goalMinutes)} aria-label={`今天已阅读 ${minutes} 分钟`}><span style={{ transform: `scaleX(${progress / 100})` }} /></div>
             <p>{remaining ? `再读 ${remaining} 分钟，就完成今天的阅读目标。` : "今天的目标已完成，想读多久都算你的时间。"}</p>
           </article>
-          <article className="reading-note-panel frosted-content">
-            <div className="reading-panel-label"><span>{data.notes.some((note) => note.source_created_at.slice(0, 10) === data.today) ? "今日回味" : "最近回味"}</span><Quotes size={18} /></div>
-            {featuredNotes.length ? <div className="reading-featured-rail" aria-label="最近三条划线内容">{featuredNotes.map((note) => <FeaturedNote key={note.id} note={note} />)}</div> : <p className="reading-empty-copy">同步后，这里会留住你划线或写下想法的句子。</p>}
-          </article>
           <aside className="reading-rhythm-panel frosted-content">
             <div><Fire size={19} weight="fill" /><span>连续阅读</span><strong>{data.streak}<small>天</small></strong></div>
             <div><ChartLineUp size={19} /><span>本周已读</span><strong>{formatReadingSeconds(data.weeklySeconds)}</strong></div>
@@ -94,9 +90,15 @@ export function ReadingPage() {
           </aside>
         </section>
 
-        <div className="reading-content-grid">
+        <div className="reading-content-stack">
           <Section title="最近翻开的书" description="按微信读书中的最后阅读时间排列" className="reading-books-section">
             {data.books.length ? <div className="reading-book-rail" aria-label="最近翻开的书，向右滑动查看更多">{data.books.map((book) => <BookRow key={book.id} book={book} />)}</div> : <p className="quiet-line">同步后会显示最近阅读的书。</p>}
+          </Section>
+          <Section title={data.notes.some((note) => note.source_created_at.slice(0, 10) === data.today) ? "今日回味" : "最近回味"} description="横向滑动，一次完整阅读一条最近划线" className="reading-reflection-section">
+            {featuredNotes.length ? <div className="reading-featured-rail" aria-label="最近三条划线内容">{featuredNotes.map((note) => <FeaturedNote key={note.id} note={note} />)}</div> : <p className="reading-empty-copy">同步后，这里会留住你划线或写下想法的句子。</p>}
+          </Section>
+          <Section title="笔记与划线" description="默认显示最近 3 条，横向滑动浏览。书签只保留数量。" className="reading-notes-section" action={data.notes.length > 3 ? <Button variant="ghost" size="sm" onClick={() => setNotesExpanded((value) => !value)}>{notesExpanded ? "收起" : `展开全部 ${data.notes.length} 条`}</Button> : undefined}>
+            {data.notes.length ? <div className="reading-note-rail" aria-label="笔记与划线，向右滑动浏览">{visibleNotes.map((note) => <NoteRow key={note.id} note={note} />)}</div> : <p className="quiet-line">还没有可显示的笔记。</p>}
           </Section>
           <Section title="阅读轨迹" description="最近 14 天的每日阅读时长" className="reading-total-section">
             <div className="reading-trajectory-summary"><div className="reading-total"><span>全部阅读</span><strong>{formatReadingSeconds(data.totalSeconds)}</strong><p>共 {data.readDays} 个有效阅读日。</p></div><div className="reading-trajectory-note"><strong>14 天</strong><span>向右滑动查看每日阅读节奏</span></div></div>
@@ -109,10 +111,6 @@ export function ReadingPage() {
             <div className="reading-calendar-grid"><div className="reading-weekdays">{["一", "二", "三", "四", "五", "六", "日"].map((day) => <span key={day}>{day}</span>)}</div><div className="reading-days">{monthCells(month).map((date, index) => date ? <button type="button" key={date} className={date === selectedDate ? "selected" : ""} data-has-reading={Number(calendarData.days[date] ?? 0) >= 60} onClick={() => setSelectedDate(date)} aria-label={`${date}，${calendarData.days[date] ? formatReadingSeconds(calendarData.days[date]) : "没有阅读记录"}`}><span>{Number(date.slice(-2))}</span>{Number(calendarData.days[date] ?? 0) >= 60 ? <small>{Math.floor(Number(calendarData.days[date]) / 60)} 分</small> : null}</button> : <span key={`empty-${index}`} />)}</div></div>
             <aside className="reading-day-detail"><span>{selectedDate.replace(/-/g, " / ")}</span><h3>{selectedSeconds ? `阅读了 ${formatReadingSeconds(selectedSeconds)}` : "这一天没有阅读记录"}</h3><p>{selectedSeconds ? "时长来自同步后的微信读书统计。" : "选择另一个有阅读时长的日期，回看当天阅读。"}</p><strong>当天阅读过的书</strong>{records.length ? <div className="reading-day-books">{records.slice(0, 5).map((book) => <span key={book.id}><BookOpen size={15} /><b>{book.title}</b><small>{book.seconds ? formatReadingSeconds(book.seconds) : "已记录阅读日期"}</small></span>)}</div> : <p className="reading-detail-empty">微信读书没有为这一天定位到书籍。</p>}</aside>
           </div>
-        </Section>
-
-        <Section title="笔记与划线" description="默认显示最近 3 条，横向滑动浏览。书签只保留数量。" className="reading-notes-section" action={data.notes.length > 3 ? <Button variant="ghost" size="sm" onClick={() => setNotesExpanded((value) => !value)}>{notesExpanded ? "收起" : `展开全部 ${data.notes.length} 条`}</Button> : undefined}>
-          {data.notes.length ? <div className="reading-note-rail" aria-label="笔记与划线，向右滑动浏览">{visibleNotes.map((note) => <NoteRow key={note.id} note={note} />)}</div> : <p className="quiet-line">还没有可显示的笔记。</p>}
         </Section>
       </>}
     </div>

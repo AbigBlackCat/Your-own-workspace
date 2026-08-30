@@ -63,7 +63,8 @@ function upsertTrain(state: WorkspaceState, train: any, date: string, index: num
     body_part: String(train.bodyPart ?? train.body_part ?? ''),
     workout_date: date,
     status,
-    feeling: noteText(train.note),
+    // 工作台内补充的训练感受优先保留，避免下一次训记同步覆盖个人复盘。
+    feeling: workout?.feeling || noteText(train.note),
     started_at: startedAt,
     completed_at: completedAt,
     source_system: 'xunji',

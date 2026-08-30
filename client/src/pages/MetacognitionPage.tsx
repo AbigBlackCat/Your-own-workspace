@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { CaretLeft, CaretRight, Clock, NotePencil, PencilSimple, Plus, Trash } from "../icons";
 import { api } from "../api";
 import { useWorkspace } from "../WorkspaceContext";
@@ -16,6 +16,7 @@ export function MetacognitionPage() {
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [draft, setDraft] = useState("");
   const [editing, setEditing] = useState<Entry | null>(null);
+  const timelineRef = useRef<HTMLDivElement>(null);
 
   const entries = useMemo(() => data.dailyMetacognitions
     .filter((entry) => !entry.deleted_at && String(entry.content ?? "").trim())
@@ -30,25 +31,26 @@ export function MetacognitionPage() {
   const createEntry = async () => {
     const content = draft.trim();
     if (!content) return;
-    await run(() => api.create("dailyMetacognitions", { entry_date: today, content, source_type: "manual" }));
+    await run(() => api.create("dailyMetacognitions", { entry_date: selectedDate, content, source_type: "manual" }));
     setDraft("");
-    setSelectedDate(today);
-    setMonth(today.slice(0, 7));
   };
   const chooseDate = (date: string) => {
     setSelectedDate(date);
     setMonth(date.slice(0, 7));
+    window.requestAnimationFrame(() => timelineRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
   };
 
   return <div className="metacognition-page">
     <PageHeader icon={<ModuleArtwork module="metacognition" />} eyebrow="日常思考" title="每日元认知" description="把主动感想、当日复盘和转化备忘保留成按分钟排序的时间线。" actions={<Button onClick={() => document.getElementById("metacognition-draft")?.focus()}><Plus size={17} />写下感想</Button>} />
 
-    <Section title="今天的主要感想" description="写下此刻最值得保留的观察，保存后会记录到今天的时间线。" className="metacognition-compose">
-      <div className="metacognition-draft"><NotePencil size={20} /><textarea id="metacognition-draft" aria-label="今日主要感想" value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="今天有什么新的发现、情绪或判断？" /><Button size="sm" onClick={() => void createEntry()} disabled={!draft.trim()}>保存感想</Button></div>
-    </Section>
+    <div ref={timelineRef}>
+      <Section title={selectedDate === today ? "今天的时间线" : `${formatDate(selectedDate)}的时间线`} description="最新记录排在最前，编辑不会改变最初的记录分钟。" className="metacognition-timeline-section">
+        {selectedEntries.length ? <div className="metacognition-timeline">{selectedEntries.map((entry) => <EntryCard key={entry.id} entry={entry} onEdit={() => setEditing(entry)} onDelete={() => void run(() => api.remove("dailyMetacognitions", entry.id))} />)}</div> : <EmptyState title="这一天还没有感想" description="在下方写下第一条感想，它会归属到当前选择的日期。" />}
+      </Section>
+    </div>
 
-    <Section title={selectedDate === today ? "今天的时间线" : `${formatDate(selectedDate)}的时间线`} description="最新记录排在最前，编辑不会改变最初的记录分钟。" className="metacognition-timeline-section">
-      {selectedEntries.length ? <div className="metacognition-timeline">{selectedEntries.map((entry) => <EntryCard key={entry.id} entry={entry} onEdit={() => setEditing(entry)} onDelete={() => void run(() => api.remove("dailyMetacognitions", entry.id))} />)}</div> : <EmptyState title="这一天还没有感想" description={selectedDate === today ? "从上方写下今天的第一条观察。" : "选择另一日期，或回到今天写下新的感想。"} action={selectedDate !== today ? <Button variant="secondary" size="sm" onClick={() => chooseDate(today)}>回到今天</Button> : undefined} />}
+    <Section title={selectedDate === today ? "今天的主要感想" : `为 ${formatDate(selectedDate)} 添加感想`} description={selectedDate === today ? "写下此刻最值得保留的观察，保存后会记录到今天的时间线。" : "记录归属到所选日期，创建时间仍保留此刻的分钟。"} className="metacognition-compose">
+      <div className="metacognition-draft"><NotePencil size={20} /><textarea id="metacognition-draft" aria-label="每日主要感想" value={draft} onChange={(event) => setDraft(event.target.value)} placeholder={selectedDate === today ? "今天有什么新的发现、情绪或判断？" : `为 ${formatDate(selectedDate)} 留下一条感想……`} /><Button size="sm" onClick={() => void createEntry()} disabled={!draft.trim()}>保存感想</Button></div>
     </Section>
 
     <Section title="每日感想" description={calendarOpen ? "选择日期，按记录时间倒序回看当天全部内容。" : "近 7 天展示每一天最新一条感想摘要。"} className="metacognition-calendar-section" action={<Button variant="ghost" size="sm" onClick={() => setCalendarOpen((value) => !value)}>{calendarOpen ? "收起日历" : "展开日历"}</Button>}>

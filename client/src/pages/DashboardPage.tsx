@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { Check, Clock, ArrowRight, NotePencil, CalendarBlank, Plus, Barbell, ListPlus, Bug, ForkKnife } from "../icons";
+import { ArrowBendDownRight, Check, Clock, ArrowRight, NotePencil, CalendarBlank, Plus, Barbell, ListPlus, Bug, ForkKnife } from "../icons";
 import { api } from "../api";
 import { useWorkspace } from "../WorkspaceContext";
 import { localDate, formatDuration, formatDate, classNames } from "../workspace-utils";
@@ -28,6 +28,7 @@ export function DashboardPage() {
   const [memoId, setMemoId] = useState<string | null>(activeMemo?.id ?? null);
   const [savedMemo, setSavedMemo] = useState(activeMemo?.content ?? "");
   const [memoError, setMemoError] = useState("");
+  const [convertOpen, setConvertOpen] = useState(false);
   const memoInput = useRef<HTMLTextAreaElement>(null);
   const now = useMinuteClock();
 
@@ -92,7 +93,17 @@ export function DashboardPage() {
         <aside className="dashboard-aside">
           <Section title="快速备忘" description="停顿后自动保存" className="memo-section">
             <div className="memo-pad"><NotePencil size={19} /><textarea ref={memoInput} aria-label="快速备忘" value={memo} onChange={(event) => setMemo(event.target.value)} placeholder="记下一闪而过的想法……" />{memoError ? <small className="field-error">{memoError}</small> : null}</div>
-            {memoId ? <div className="memo-actions"><Button size="sm" variant="ghost" onClick={async () => { await run(() => api.convertMemo(memoId, "planItems", { plan_date: date })); setMemo(""); setSavedMemo(""); setMemoId(null); }}>转为今日事项</Button><Button size="sm" variant="ghost" onClick={async () => { await run(() => api.convertMemo(memoId, "dailyMetacognitions", { entry_date: localDate(), source_type: "quick_memo", source_id: memoId })); setMemo(""); setSavedMemo(""); setMemoId(null); }}>转为每日元认知</Button><Button size="sm" variant="ghost" onClick={async () => { await run(() => api.convertMemo(memoId, "mediaContents", { stage: "idea" })); setMemo(""); setSavedMemo(""); setMemoId(null); }}>转为内容灵感</Button></div> : null}
+            {memoId ? <div className="memo-actions">
+              <span>备忘已保存</span>
+              <div className="memo-convert-menu">
+                <Button size="sm" variant="ghost" className="memo-convert-trigger" aria-label="转为其他内容" aria-expanded={convertOpen} onClick={() => setConvertOpen((value) => !value)}><ArrowBendDownRight size={16} /></Button>
+                {convertOpen ? <div className="memo-convert-popover" role="menu" aria-label="转为">
+                  <button role="menuitem" onClick={async () => { await run(() => api.convertMemo(memoId, "planItems", { plan_date: date })); setMemo(""); setSavedMemo(""); setMemoId(null); setConvertOpen(false); }}>转为今日事项</button>
+                  <button role="menuitem" onClick={async () => { await run(() => api.convertMemo(memoId, "dailyMetacognitions", { entry_date: localDate(), source_type: "quick_memo", source_id: memoId })); setMemo(""); setSavedMemo(""); setMemoId(null); setConvertOpen(false); }}>转为每日元认知</button>
+                  <button role="menuitem" onClick={async () => { await run(() => api.convertMemo(memoId, "mediaContents", { stage: "idea" })); setMemo(""); setSavedMemo(""); setMemoId(null); setConvertOpen(false); }}>转为内容灵感</button>
+                </div> : null}
+              </div>
+            </div> : null}
           </Section>
           <Section title="需要关注" description="到期、跟进与今日提醒">
             {value.attention.length ? <div className="attention-list">{value.attention.map((item) => <button key={`${item.attention_type}-${item.id}`} onClick={() => navigate(item.module === "today" ? "/today" : `/${item.module}`)}><span className="attention-mark" /><div><strong>{item.display_title || item.title || item.name || item.content}</strong><small>{item.due_date ? `截止 ${formatDate(item.due_date)}` : item.followup_at ? `跟进 ${formatDate(item.followup_at)}` : "需要处理"}</small></div><ArrowRight size={16} /></button>)}</div> : <p className="quiet-line">目前没有紧急事项。</p>}

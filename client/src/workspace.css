@@ -1113,6 +1113,26 @@ input[type="checkbox"] { accent-color: var(--accent); width: 14px; height: 14px;
 .memo-pad textarea:focus { border-color: var(--accent); background: var(--surface-raised); padding: 8px 10px; box-shadow: 0 0 0 3px var(--accent-soft); }
 .memo-pad textarea::placeholder, .review-input::placeholder { color: var(--text-faint); }
 .memo-actions { display: flex; gap: 4px; justify-content: flex-end; margin-top: 8px; }
+.memo-actions > span { margin-right: auto; align-self: center; color: var(--text-faint); font-size: 10.5px; }
+.memo-convert-menu { position: relative; }
+.memo-convert-trigger { width: 32px; min-width: 32px; padding-inline: 0; }
+.memo-convert-popover {
+  position: absolute;
+  z-index: 20;
+  right: 0;
+  bottom: calc(100% + 7px);
+  width: max-content;
+  min-width: 158px;
+  display: grid;
+  gap: 3px;
+  padding: 5px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-inset);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-control);
+}
+.memo-convert-popover button { border: 0; border-radius: 8px; background: transparent; padding: 8px 10px; color: var(--text-soft); font-size: 11px; text-align: left; cursor: pointer; }
+.memo-convert-popover button:hover, .memo-convert-popover button:focus-visible { background: var(--accent-soft); color: var(--accent-deep); outline: 0; }
 
 .timeline-list, .plain-list, .attention-list, .plan-table, .work-list, .log-list,
 .check-list, .interaction-timeline, .session-list, .backup-list, .preferences, .trash-list { display: grid; }
@@ -1644,6 +1664,27 @@ input[type="checkbox"] { accent-color: var(--accent); width: 14px; height: 14px;
 .history-table strong { font-size: 11.5px; font-weight: 580; }
 .history-table small { color: var(--text-soft); font-size: 10.5px; }
 .history-table p { grid-column: 1 / -1; margin: 0; color: var(--text-soft); font-size: 10.5px; }
+
+/* 健身训练日：训练完成状态优先于普通日程，保持整个月历的浏览节奏。 */
+.fitness-calendar-section .month-calendar-day:has(.workout-completed) { background: color-mix(in srgb, var(--success) 8%, transparent); }
+.fitness-calendar-section .calendar-entry.workout-completed {
+  border-color: color-mix(in srgb, var(--success) 78%, var(--border));
+  background: var(--success);
+  box-shadow: 0 5px 14px -9px color-mix(in srgb, var(--success) 90%, transparent);
+  color: #fff;
+}
+.fitness-calendar-section .calendar-entry.workout-completed strong { display: flex; align-items: center; gap: 4px; color: #fff; }
+.fitness-calendar-section .calendar-entry.workout-completed strong b { font-size: 10px; font-weight: 700; letter-spacing: .02em; }
+.fitness-calendar-section .calendar-entry.workout-completed strong span { margin-left: auto; color: rgba(255, 255, 255, .78); font-size: 8.5px; }
+.fitness-calendar-section .calendar-entry.workout-completed > span { color: rgba(255, 255, 255, .86); }
+.fitness-calendar-section .calendar-entry.workout-planned { background: color-mix(in srgb, var(--surface-raised) 88%, var(--success-soft)); }
+.fitness-calendar-section .calendar-entry.workout-planned strong { display: flex; align-items: center; gap: 4px; }
+.fitness-calendar-section .calendar-entry.workout-planned strong b { font-size: 10px; }
+.fitness-calendar-section .calendar-entry.workout-planned strong span { margin-left: auto; color: var(--text-faint); font-size: 8.5px; }
+.fitness-calendar-section .calendar-selected-detail { border: 1px solid color-mix(in srgb, var(--success) 28%, var(--border)); background: linear-gradient(120deg, var(--success-soft), transparent 68%); }
+.fitness-calendar-section .calendar-detail-list article { padding: 10px 0 2px; }
+.history-table article { align-items: start; }
+.history-table .workout-feeling-edit { grid-column: 1 / -1; justify-self: start; margin-top: 2px; }
 
 /* --- 10g. 饮食计划 -------------------------------------------------------- */
 
@@ -2396,18 +2437,15 @@ a.reading-book-row:hover { color: var(--accent-deep); }
 
 /* 阅读桌面：内容优先的两段式节奏 */
 .reading-focus {
-  grid-template-columns: minmax(245px, .82fr) minmax(0, 1.55fr);
-  grid-template-areas:
-    "progress reflection"
-    "rhythm reflection";
+  grid-template-columns: minmax(245px, 1.1fr) minmax(320px, .9fr);
+  grid-template-areas: "progress rhythm";
   align-items: stretch;
 }
 .reading-progress-panel { grid-area: progress; min-height: 156px; }
-.reading-note-panel { grid-area: reflection; min-height: 306px; }
-.reading-rhythm-panel { grid-area: rhythm; min-height: 138px; grid-template-columns: repeat(3, minmax(0, 1fr)); align-content: center; }
+.reading-rhythm-panel { grid-area: rhythm; min-height: 156px; grid-template-columns: repeat(3, minmax(0, 1fr)); align-content: center; }
 .reading-rhythm-panel > div { grid-template-columns: 20px minmax(0, 1fr); }
 .reading-rhythm-panel strong { grid-column: 2; }
-.reading-content-grid { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+.reading-content-grid, .reading-content-stack { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
 .reading-total-section { display: grid; gap: 18px; }
 .reading-trajectory-summary { display: flex; align-items: end; justify-content: space-between; gap: 18px; }
 .reading-trajectory-summary .reading-total { min-height: 0; }
@@ -2425,17 +2463,14 @@ a.reading-book-row:hover { color: var(--accent-deep); }
 
 @media (max-width: 1200px) {
   .reading-focus {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
-    grid-template-areas:
-      "progress reflection"
-      "rhythm rhythm";
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas: "progress rhythm";
   }
   .reading-rhythm-panel { min-height: auto; }
 }
 
 @media (max-width: 900px) {
-  .reading-focus { grid-template-columns: minmax(0, 1fr); grid-template-areas: "progress" "reflection" "rhythm"; }
-  .reading-note-panel { min-height: 250px; }
+  .reading-focus { grid-template-columns: minmax(0, 1fr); grid-template-areas: "progress" "rhythm"; }
 }
 
 @media (max-width: 760px) {
