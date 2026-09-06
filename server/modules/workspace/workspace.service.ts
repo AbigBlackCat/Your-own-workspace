@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { DRIZZLE_DATABASE, type PostgresJsDatabase } from '@lark-apaas/fullstack-nestjs-core';
 import { and, eq } from 'drizzle-orm';
+import { planPatch, validPlanDate } from '../../../shared/plan-utils';
 
 import { workspaceDocument } from '../../database/schema';
 import {
@@ -103,6 +104,7 @@ export class WorkspaceService {
           title: row[definition.title],
           updated_at: row.updated_at,
           collection: name,
+          planDate: name === 'planItems' ? row.plan_date : undefined,
           module: definition.module,
         });
       }
@@ -117,7 +119,12 @@ export class WorkspaceService {
       const clean = this.sanitize(collection, input);
       this.requireFields(definition.required, clean);
       const now = new Date().toISOString();
-      const row = { id: randomUUID(), ...clean, created_at: now, updated_at: now, deleted_at: null } as Entity;
+      let values = clean;
+      if (collection === 'planItems') {
+        try { values = planPatch({}, clean, now); }
+        catch (error) { throw new BadRequestException((error as Error).message); }
+      }
+      const row = { id: randomUUID(), ...values, created_at: now, updated_at: now, deleted_at: null } as Entity;
       state[collection].unshift(row);
       return row;
     });
@@ -171,35 +178,24 @@ export class WorkspaceService {
   }
 
   async completePlan(userId: string, id: string): Promise<Entity> {
-    return this.mutate(userId, (state) => {
-      const item = this.getFromState(state, 'planItems', id);
-      const now = new Date().toISOString();
-      const updated = this.updateInState(state, 'planItems', id, { status: 'done', completed_at: now });
-      if (item.complete_source && item.source_entity_type && item.source_entity_id) {
-        const collection = sourceCollectionByType[item.source_entity_type];
-        if (collection) {
-          const source = this.getFromState(state, collection, item.source_entity_id);
-          if (Object.hasOwn(source, 'status')) {
-            source.status = collection === 'workouts' ? 'completed' : 'done';
-            source.updated_at = now;
-          }
-        }
-      }
-      return updated;
-    });
+    return this.mutate(userId, (state) => this.updateInState(state, 'planItems', id, { status: 'done' }));
   }
 
   async postponePlan(userId: string, id: string, date: string): Promise<Entity> {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new BadRequestException('日期格式无效');
-    return this.mutate(userId, (state) => this.updateInState(state, 'planItems', id, { plan_date: date, status: 'todo', completed_at: null }));
+    if (!validPlanDate(date)) throw new BadRequestException('请选择有效的计划日期');
+    return this.mutate(userId, (state) => this.updateInState(state, 'planItems', id, { plan_date: date }));
   }
 
   async getReview(userId: string, date: string): Promise<Entity | null> {
-    const state = await this.state(userId);
+    if (!validPlanDate(date)) throw new BadRequestException('请选择有效日期');
+    const state = await this.rawState(userId);
+    const entry = state.dailyMetacognitions.find((row: Entity) => row.id === `daily-review:${date}`);
+    if (entry) return entry.deleted_at ? null : { ...entry, review_date: date };
     return state.dailyReviews.find((row) => row.review_date === date) ?? null;
   }
 
   async setReview(userId: string, date: string, content: string): Promise<Entity> {
+    if (!validPlanDate(date)) throw new BadRequestException('请选择有效日期');
     return this.mutate(userId, (state) => {
       const now = new Date().toISOString();
       let review = state.dailyReviews.find((row) => row.review_date === date);
@@ -277,12 +273,17 @@ export class WorkspaceService {
   private async mutate<T>(userId: string, operation: (state: WorkspaceState) => T): Promise<T> {
     if (!userId) throw new BadRequestException('请先登录飞书账号');
     const document = await this.getOrCreateDocument(userId);
-    const state = normalizeState(structuredClone(document.state as Record<string, any>));
-    const result = operation(state);
-    const now = new Date();
-    await this.db.update(workspaceDocument).set({ state, updatedAt: now, updatedBy: userId })
-      .where(and(eq(workspaceDocument.id, document.id), eq(workspaceDocument.ownerProfile, userId)));
-    return result;
+    // Serialize updates to the workspace document so autosave and plan actions cannot overwrite each other.
+    return this.db.transaction(async (tx) => {
+      const [locked] = await tx.select().from(workspaceDocument)
+        .where(and(eq(workspaceDocument.id, document.id), eq(workspaceDocument.ownerProfile, userId)))
+        .for('update');
+      const state = normalizeState(structuredClone(locked.state as Record<string, any>));
+      const result = operation(state);
+      await tx.update(workspaceDocument).set({ state, updatedAt: new Date(), updatedBy: userId })
+        .where(and(eq(workspaceDocument.id, document.id), eq(workspaceDocument.ownerProfile, userId)));
+      return result;
+    });
   }
 
   private async getOrCreateDocument(userId: string): Promise<typeof workspaceDocument.$inferSelect> {
@@ -318,10 +319,40 @@ export class WorkspaceService {
   }
 
   private updateInState(state: WorkspaceState, name: CollectionName, id: string, input: Record<string, any>): Entity {
-    const row = this.getFromState(state, name, id, true);
-    const clean = this.sanitize(name, input);
+    const row = this.getFromState(state, name, id);
+    let clean = this.sanitize(name, input);
     if (!Object.keys(clean).length) throw new BadRequestException('没有可更新的内容');
-    Object.assign(row, clean, { updated_at: new Date().toISOString() });
+    const now = new Date().toISOString();
+    if (name === 'planItems') {
+      const previousStatus = row.status;
+      try { clean = planPatch(row, clean, now); }
+      catch (error) { throw new BadRequestException((error as Error).message); }
+      if (row.complete_source && row.source_entity_type && row.source_entity_id) {
+        const collection = sourceCollectionByType[row.source_entity_type];
+        const source = collection && this.listFromState(state, collection).find((item) => item.id === row.source_entity_id);
+        if (source && Object.hasOwn(source, 'status')) {
+          if (clean.status === 'done' && previousStatus !== 'done') {
+            clean.source_completion_before = { status: source.status, completedAt: source.completed_at ?? null };
+            source.status = collection === 'workouts' ? 'completed' : 'done';
+            source.updated_at = now;
+            clean.source_completion_version = now;
+          } else if (previousStatus === 'done' && clean.status !== 'done') {
+            if (row.source_completion_before && source.updated_at === row.source_completion_version) {
+              source.status = row.source_completion_before.status;
+              if (Object.hasOwn(source, 'completed_at')) source.completed_at = row.source_completion_before.completedAt;
+              source.updated_at = now;
+            }
+            clean.source_completion_before = null;
+            clean.source_completion_version = null;
+          }
+        }
+      }
+    }
+    Object.assign(row, clean, { updated_at: now });
+    if (name === 'dailyMetacognitions' && row.source_type === 'daily_review') {
+      const review = state.dailyReviews.find((item) => item.review_date === row.source_id);
+      if (review) Object.assign(review, { content: row.content, updated_at: now });
+    }
     return row;
   }
 

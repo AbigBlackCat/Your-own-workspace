@@ -3,6 +3,8 @@ import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { ArrowBendDownRight, Check, Clock, ArrowRight, NotePencil, CalendarBlank, Plus, Barbell, ListPlus, Bug, ForkKnife } from "../icons";
 import { api } from "../api";
+import { planSourceRoute, recordRoute } from "../plan-view";
+import { isUnfinished } from "../../../shared/plan-utils";
 import { useWorkspace } from "../WorkspaceContext";
 import { localDate, formatDuration, formatDate, classNames } from "../workspace-utils";
 import { getTimeProgress, minutesPerDay } from "../timeProgress";
@@ -66,7 +68,10 @@ export function DashboardPage() {
   return (
     <div className="dashboard-page">
       <PageHeader icon={<ModuleArtwork module="dashboard" />} eyebrow={new Intl.DateTimeFormat("zh-CN", { weekday: "long" }).format(new Date())} title={`${new Intl.DateTimeFormat("zh-CN", { month: "long", day: "numeric" }).format(new Date())}，从重点开始`} description="今天的行动、提醒和工作生活状态都在这里。" actions={<Button onClick={() => navigate("/today?new=1")}><Plus size={17} />添加今日事项</Button>} />
-      <TimeProgress now={now} />
+      {data.planItems.some((item) => item.plan_date < date && isUnfinished(item)) ? <Section
+        title={`此前未完成（${data.planItems.filter((item) => item.plan_date < date && isUnfinished(item)).length}）`}
+        description="旧计划保留在原日期，选择今天继续或重新安排。"
+        action={<Button size="sm" variant="secondary" onClick={() => navigate("/today")}>处理未完成事项</Button>}><p className="quiet-line">这些事项不会自动挤入今天的时间线。</p></Section> : null}
       <div className="overview-strip">
         <div><span>计划进度</span><strong>{value.overview.progress}<small>%</small></strong></div>
         <div className="progress-track"><span style={{ width: `${value.overview.progress}%` }} /></div>
@@ -78,16 +83,15 @@ export function DashboardPage() {
         <button onClick={() => navigate("/today?new=1")}><ListPlus size={17} />新建计划</button>
         <button onClick={() => memoInput.current?.focus()}><NotePencil size={17} />记录备忘</button>
         <button onClick={() => navigate("/development?new=work-item")}><Bug size={17} />添加工作项</button>
-        <button onClick={() => navigate("/fitness?new=workout")}><Barbell size={17} />记录训练</button>
-        <button onClick={() => navigate("/diet?new=meal")}><ForkKnife size={17} />记录饮食</button>
+        <details className="dashboard-more-actions"><summary>更多</summary><button onClick={() => navigate("/fitness?new=workout")}><Barbell size={17} />记录训练</button><button onClick={() => navigate("/diet?new=meal")}><ForkKnife size={17} />记录饮食</button></details>
       </nav>
       <div className="dashboard-grid">
         <div className="dashboard-primary">
           <Section title="今日时间线" description="有明确开始时间的事项" action={<Button variant="ghost" size="sm" onClick={() => navigate("/today")}>打开计划<ArrowRight size={15} /></Button>}>
-            {value.timeline.length ? <div className="timeline-list">{value.timeline.map((item) => <PlanRow key={item.id} item={item} onComplete={() => run(() => api.completePlan(item.id))} onOpenSource={item.source_module ? () => navigate(sourceRoutes[item.source_module] ?? "/today") : undefined} />)}</div> : <EmptyState title="今天还没有时间安排" description="把最重要的一件事放进时间线。" action={<Button variant="secondary" size="sm" onClick={() => navigate("/today?new=1")}>添加事项</Button>} />}
+            {value.timeline.length ? <div className="timeline-list">{value.timeline.map((item) => <PlanRow key={item.id} item={item} onComplete={() => run(() => api.completePlan(item.id))} onOpenSource={item.source_module ? () => navigate(planSourceRoute(item)) : undefined} />)}</div> : <EmptyState title="今天还没有时间安排" description="把最重要的一件事放进时间线。" action={<Button variant="secondary" size="sm" onClick={() => navigate("/today?new=1")}>添加事项</Button>} />}
           </Section>
           <Section title="待安排" description="属于今天，但还没有具体时间">
-            {value.unscheduled.length ? <div className="plain-list">{value.unscheduled.map((item) => <PlanRow key={item.id} item={item} onComplete={() => run(() => api.completePlan(item.id))} onOpenSource={item.source_module ? () => navigate(sourceRoutes[item.source_module] ?? "/today") : undefined} />)}</div> : <p className="quiet-line">所有今日事项都已经安排妥当。</p>}
+            {value.unscheduled.length ? <div className="plain-list">{value.unscheduled.map((item) => <PlanRow key={item.id} item={item} onComplete={() => run(() => api.completePlan(item.id))} onOpenSource={item.source_module ? () => navigate(planSourceRoute(item)) : undefined} />)}</div> : <p className="quiet-line">所有今日事项都已经安排妥当。</p>}
           </Section>
         </div>
         <aside className="dashboard-aside">
@@ -106,10 +110,14 @@ export function DashboardPage() {
             </div> : null}
           </Section>
           <Section title="需要关注" description="到期、跟进与今日提醒">
-            {value.attention.length ? <div className="attention-list">{value.attention.map((item) => <button key={`${item.attention_type}-${item.id}`} onClick={() => navigate(item.module === "today" ? "/today" : `/${item.module}`)}><span className="attention-mark" /><div><strong>{item.display_title || item.title || item.name || item.content}</strong><small>{item.due_date ? `截止 ${formatDate(item.due_date)}` : item.followup_at ? `跟进 ${formatDate(item.followup_at)}` : "需要处理"}</small></div><ArrowRight size={16} /></button>)}</div> : <p className="quiet-line">目前没有紧急事项。</p>}
+            {value.attention.length ? <div className="attention-list">{value.attention.map((item) => <button key={`${item.attention_type}-${item.id}`} onClick={() => navigate(item.module === "today"
+                ? recordRoute("today", "planItems", item.id, item.plan_date)
+                : recordRoute(item.module, item.attention_type === "deliverable" ? "consultingDeliverables"
+                  : item.attention_type === "followup" ? "consultingFollowups" : "workouts", item.id))}><span className="attention-mark" /><div><strong>{item.display_title || item.title || item.name || item.content}</strong><small>{item.due_date ? `截止 ${formatDate(item.due_date)}` : item.followup_at ? `跟进 ${formatDate(item.followup_at)}` : "需要处理"}</small></div><ArrowRight size={16} /></button>)}</div> : <p className="quiet-line">目前没有紧急事项。</p>}
           </Section>
         </aside>
       </div>
+      <details className="dashboard-time-summary"><summary>人生与今日时间进度</summary><TimeProgress now={now} /></details>
       <Section title="各模块摘要" description="只展示近期真正需要留意的内容">
         <div className="summary-grid">{Object.entries(summaryMeta).filter(([key]) => !Array.isArray(data.settings.dashboardModules) || data.settings.dashboardModules.includes(key)).map(([key, meta]) => {
           const items = value.summaries[key] ?? [];
@@ -158,5 +166,5 @@ const sourceRoutes: Record<string, string> = { media: "/media", development: "/d
 
 function PlanRow({ item, onComplete, onOpenSource }: { item: Record<string, any>; onComplete: () => Promise<any>; onOpenSource?: () => void }) {
   const done = item.status === "done";
-  return <div className={classNames("plan-row", done && "is-done")}><button className="complete-control" aria-label={done ? "已完成" : "标记完成"} disabled={done} onClick={() => void onComplete()}>{done ? <Check size={14} weight="bold" /> : null}</button>{item.start_time ? <span className="plan-time"><Clock size={14} />{item.start_time}</span> : <span className="plan-time"><CalendarBlank size={14} />待安排</span>}<div className="plan-copy"><strong>{item.display_title || item.title}</strong>{item.notes ? <small>{item.notes}</small> : null}{onOpenSource ? <button className="text-button source-link" onClick={onOpenSource}>打开来源 <ArrowRight size={13} /></button> : null}</div><Badge tone={item.priority === "high" ? "warning" : "neutral"}>{item.priority === "high" ? "高优先" : item.estimated_minutes ? `${item.estimated_minutes} 分钟` : "普通"}</Badge></div>;
+  return <div className={classNames("plan-row", done && "is-done")}><button className="complete-control" aria-label={`${done ? "已完成" : "标记完成"}：${item.title}`} disabled={done} onClick={() => void onComplete()}>{done ? <Check size={14} weight="bold" /> : null}</button>{item.start_time ? <span className="plan-time"><Clock size={14} />{item.start_time}</span> : <span className="plan-time"><CalendarBlank size={14} />待安排</span>}<div className="plan-copy"><strong>{item.display_title || item.title}</strong>{item.notes ? <small>{item.notes}</small> : null}{onOpenSource ? <button className="text-button source-link" onClick={onOpenSource}>打开来源 <ArrowRight size={13} /></button> : null}</div><Badge tone={item.priority === "high" ? "warning" : "neutral"}>{item.priority === "high" ? "高优先" : item.estimated_minutes ? `${item.estimated_minutes} 分钟` : "普通"}</Badge></div>;
 }

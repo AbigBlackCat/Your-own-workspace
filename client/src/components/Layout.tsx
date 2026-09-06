@@ -6,6 +6,8 @@ import {
   ArrowRight, Command, ShipIcon,
 } from "../icons";
 import { api } from "../api";
+import { RecordDetail } from "./RecordDetail";
+import { recordRoute } from "../plan-view";
 import { useWorkspace } from "../WorkspaceContext";
 import { classNames } from "../workspace-utils";
 import { normalizeAppearance } from "../appearance";
@@ -152,7 +154,7 @@ export function AppLayout() {
           ))}
         </nav>
         <div className="sidebar-foot">
-          <div className="local-state"><span className="status-dot" /><div><strong>仅本人可访问</strong><small>Serverless PostgreSQL · 自动保护</small></div></div>
+          <div className="local-state"><span className="status-dot" /><div><strong>仅本人可访问</strong><small>私人记录 · 云端保存</small></div></div>
         </div>
       </aside>
       <div className="app-main">
@@ -165,12 +167,13 @@ export function AppLayout() {
           </div>
           <div className="topbar-actions">
             <button className="search-trigger glass-clear" aria-label="搜索所有内容" title="搜索所有内容" onClick={() => setSearchOpen(true)}><MagnifyingGlass size={18} /><span>搜索所有内容</span><kbd><Command size={12} />K</kbd></button>
-            <Button className="topbar-create" variant="secondary" size="sm" onClick={() => setQuickOpen(true)}><Plus size={16} />快速新建</Button>
+            <Button className="topbar-create" variant="secondary" size="sm" onClick={() => setQuickOpen(true)}><Plus size={16} />快速新增</Button>
             <SaveIndicator status={saveStatus} />
           </div>
         </header>
         <main className="page-container" id="main-content" tabIndex={-1}><Outlet /></main>
       </div>
+      <RecordDetail />
       <SearchModal open={searchOpen} onClose={() => setSearchOpen(false)} />
       <QuickCreateModal open={quickOpen} onClose={() => setQuickOpen(false)} />
       <nav className="mobile-dock" aria-label="手机快捷导航">
@@ -219,7 +222,7 @@ function SearchModal({ open, onClose }: { open: boolean; onClose: () => void }) 
       <div className="search-results">
         {!query ? <div className="search-hint">输入内容开始搜索，按 Esc 关闭。</div> : search.isLoading ? <Skeleton lines={4} /> : search.error ? <ErrorState message={(search.error as Error).message} /> : search.data?.length === 0 ? <div className="search-hint">没有找到匹配内容。</div> : Object.entries(grouped).map(([module, items]) => (
           <section className="search-group" key={module}><h3>{moduleNames[module] ?? module}</h3>{items.map((item) => (
-            <button key={`${item.collection}-${item.id}`} onClick={() => { navigate(collectionRoutes[item.collection] ?? "/"); onClose(); }}><span>{item.title || "未命名记录"}</span><ArrowRight size={16} /></button>
+            <button key={`${item.collection}-${item.id}`} onClick={() => { navigate(recordRoute(item.module, item.collection, item.id, item.planDate)); onClose(); }}><span>{item.title || "未命名记录"}</span><ArrowRight size={16} /></button>
           ))}</section>
         ))}
       </div>

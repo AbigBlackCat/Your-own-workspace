@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { useForm } from "react-hook-form";
 import { X, WarningCircle, SpinnerGap } from "../icons";
 import { classNames } from "../workspace-utils";
@@ -119,6 +119,8 @@ export type FieldDefinition = {
   helper?: string;
   options?: Array<{ value: string; label: string }>;
   step?: string;
+  min?: number;
+  max?: number;
 };
 
 export function EntityForm({
@@ -135,14 +137,17 @@ export function EntityForm({
   onCancel: () => void;
 }) {
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm({ defaultValues: initial });
+  const [submitError, setSubmitError] = useState('');
   const submit = handleSubmit(async (values) => {
+    setSubmitError('');
     const normalized = Object.fromEntries(fields.map((field) => {
       const value = values[field.name];
       if (field.type === "number") return [field.name, value === "" || value === undefined ? null : Number(value)];
       if (field.type === "checkbox") return [field.name, Boolean(value)];
       return [field.name, value ?? ""];
     }));
-    await onSubmit(normalized);
+    try { await onSubmit(normalized); }
+    catch (error) { setSubmitError(error instanceof Error ? error.message : '保存失败，请重试'); }
   });
   return (
     <form className="entity-form" onSubmit={submit}>
@@ -162,7 +167,7 @@ export function EntityForm({
             ) : field.type === "checkbox" ? (
               <input type="checkbox" {...register(field.name)} />
             ) : (
-              <input type={field.type ?? "text"} step={field.step} aria-invalid={invalid} placeholder={field.placeholder} {...register(field.name, { required: field.required ? "请填写此项" : false })} />
+              <input type={field.type ?? "text"} step={field.step} min={field.min} max={field.max} aria-invalid={invalid} placeholder={field.placeholder} {...register(field.name, { required: field.required ? "请填写此项" : false })} />
             )}
             {field.helper ? <small>{field.helper}</small> : null}
             {invalid ? <small className="field-error"><WarningCircle size={12} weight="fill" aria-hidden />{String(errors[field.name]?.message)}</small> : null}
@@ -170,6 +175,7 @@ export function EntityForm({
           );
         })}
       </div>
+      {submitError ? <p className="field-error" role="alert">{submitError}。输入内容已保留，请重试。</p> : null}
       <footer className="modal-actions">
         <Button type="button" variant="ghost" onClick={onCancel}>取消</Button>
         <Button type="submit" loading={isSubmitting}>{submitLabel}</Button>
